@@ -21,64 +21,11 @@ args = parser.parse_args()
 # -----------------------------
 # 1) Build a Kenworth T680E–like BEV
 # -----------------------------
-# SOURCES (specs):
-# - The T680E is a Class 8 battery-electric day cab. Public materials describe a 396 kWh pack (nominal/usable varies by doc),
-#   approx ~150-250 mi range depending on duty, and ~536 hp (~400 kW) traction (varies by configuration).
-#   See Kenworth spec pages & press releases. :contentReference[oaicite:0]{index=0}
-#
-# NOTE: FASTSim expects a fairly detailed vehicle dict. Below are reasonable, documented fields with snake_case
-# names per the FASTSim Python API. You can adjust as you calibrate.
-# API reference for Vehicle.from_dict / Cycle.from_file / SimDrive.sim_drive: :contentReference[oaicite:1]{index=1}
 
-t680e = {
-    # --- identity ---
-    "veh_name": "Kenworth T680E",
-    "veh_pt_type": "BEV",  # Battery Electric Vehicle
-
-    # --- massing ---
-    # Tractor day cab curb ~ 8–10t; with chassis & e-components often >10t; add payload for Class 8. We start with a moderate GC mass.
-    # Adjust to your use case & validation data.
-    "glider_mass_kg": 10500.0,            # chassis/body without powertrain (inferred)
-    "mc_mass_kg": 450.0,             # traction motor + inverter mass (inferred)
-    "ess_mass_kg": 2500.0,           # 396 kWh Li-ion pack ~ 6–7 kg/kWh typical HD pack incl. structure (inferred)
-    "cargo_mass_kg": 22_500.0,              # payload for day-cab line-haul short route (example)
-    "comp_mass_kg": 300.0,           # auxiliaries (HVAC pumps, etc., inferred)
-    # "veh_override_kg": -1.0,         # let FASTSim compute from components
-
-    # --- road load ---
-    "drag_coef": 0.6,                # Class 8 aero, day cab; tune if you have a C_d·A (inferred)
-    "frontal_area_m2": 10.0,         # tractor FA (inferred)
-    "wheel_rr_coeff": 0.0065,              # heavy truck tire rolling resistance (inferred typical)
-    "wheel_radius_m": 0.5,        # effective wheel radius ~ 19.5–22.5" tires (inferred)
-
-    # --- driveline / gearing ---
-    "mc_max_pwr_kw": 400.0,              # ~536 hp peak ≈ 400 kW (spec-ish; some materials list similar) :contentReference[oaicite:2]{index=2}
-    "mc_full_eff_array": [],         # empty -> FASTSim default map  This actually might be mc_eff_array according to the documentation.
-    "trans_eff": 0.97,           # final drive efficiency (typical)
-    "final_drive_ratio": 3.5,                 # overall reduction (example—tune)
-    "max_trq_Nm": 3500.0,            # generous HD e-axle torque (inferred)
-    "aux_kw": 2.5,                  # parasitic at idle (example)
-
-    # --- battery / charging ---
-    "ess_capacity_kwh": 396.0,            # pack energy (spec figure commonly cited for T680E) :contentReference[oaicite:3]{index=3}
-    "ess_max_pwr_kw": 400.0,             # discharge power ~= motor peak (constrained by thermal)
-    "ess_soc_min": 0.1,              # reserve
-    "ess_soc_max": 0.9,              # preserve pack life in sim
-    "ess_round_trip_eff": 0.93, # typical Li-ion round trip
-
-    # # --- auxiliaries / HVAC ---
-    # "aux_kw": 2.0,                   # hotel loads, compressors, etc. (example)
-    # "trans_efficiency": 1.0,         # single-speed e-axle -> no separate trans losses
-
-    # --- limits/others (defaults generally OK) ---
-    "max_accel_m_per_s2": 1.0,       # governs trace following if underpowered (example)
-    "regen_brake_mode": 1.0,           # allow regen
-}
-
-veh = fsim.Vehicle.from_pydict(t680e)
+veh = fsim.Vehicle.from_file("/home/zacmaughan/repos/routee-powertrain/scripts/fastsim/kenworth_t680e.yaml")
 
 # -----------------------------
-# 2) Build a “classic U.S.” mixed cycle (UDDS + HWFET + US06)
+# 2) Build a “classic U.S.” cycle (UDDS, HWFET, US06)
 # -----------------------------
 # The UDDS is a typical urban cycle, HWFET is a highway cycle, and US06 is an aggressive highway cycle.
 
@@ -99,8 +46,8 @@ out = sd.sim_drive(init_soc=0.8)
 # battery SOC arrays. If a key below is missing in your version, comment it out and re-run.
 
 summary = {
-    "vehicle": veh.veh_name,
-    "route_name": "UDDS+HWFET+US06",
+    "vehicle": veh.name,
+    "route_name": "Classic U.S. Cycle",
     "total_distance_km": getattr(sd, "dist_m", 0.0) / 1000.0 if hasattr(sd, "dist_m") else None,
     "final_soc": getattr(sd, "ess_soc", [None])[-1] if hasattr(sd, "ess_soc") else None,
 }

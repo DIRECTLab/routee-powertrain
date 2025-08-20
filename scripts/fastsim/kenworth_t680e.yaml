@@ -1,11 +1,11 @@
 name: Kenworth T680E
-doc: Generated as a realistic FASTSim 3.0.5 template for simulation
+doc: Reasonably accurate model of a Kenworth T680E battery electric truck, based on the 2021 model year
 year: 2021
 
 pt_type:
   BEV:
     em:
-      pwr_out_max_watts: 500000.0
+      pwr_out_max_watts: 900000.0 # max power output from motor
       mass_kilograms: 500.0
       eff_interp_achieved:
         data:
@@ -33,7 +33,7 @@ pt_type:
         energy_out_req_joules: 0.0
         pwr_elec_prop_in_watts: 0.0
         pwr_mech_fwd_out_max_watts: 0.0
-        pwr_mech_regen_max_watts: 0.0
+        pwr_mech_regen_max_watts: 150000.0  # Realistic 150 kW regen limit
         pwr_out_req_watts: 0.0
         pwr_mech_prop_out_watts: 0.0
         pwr_mech_dyn_brake_watts: 0.0
@@ -62,12 +62,34 @@ pt_type:
     transmission:
       mass_kilograms: 400.0
       eff_interp: 0.96
+      state:
+        i: 0
+        eff: 0.96
+        energy_in_joules: 0.0
+        energy_out_joules: 0.0
+        energy_loss_joules: 0.0
+        pwr_out_regen_max_watts: 150000.0  # Realistic 150 kW regen limit
+        pwr_out_fwd_max_watts: 550000.0  # max power output from motor
+        pwr_out_watts: 0.0
+        pwr_in_watts: 0.0
+        pwr_loss_watts: 0.0
+      history:
+        i: []
+        eff: []
+        energy_in_joules: []
+        energy_out_joules: []
+        energy_loss_joules: []
+        pwr_out_regen_max_watts: []
+        pwr_out_fwd_max_watts: []
+        pwr_out_watts: []
+        pwr_in_watts: []
+        pwr_loss_watts: []
 
     res:
       energy_capacity_joules: 1.43e12          # 396 kWh battery
-      specific_energy_joules_per_kilogram: 1.7875e6  # energy_density = capacity / mass
-      pwr_out_max_watts: 500000.0           # max continuous battery output
-      mass_kilograms: 800.0                 # battery mass
+      specific_energy_joules_per_kilogram: 621739130.4  # energy_density = capacity / mass
+      pwr_out_max_watts: 900000.0           # max continuous battery output
+      mass_kilograms: 2300.0                 # battery mass
       save_interval: 1
       eff_interp:
         Constant: 0.95
@@ -84,7 +106,7 @@ pt_type:
         pwr_prop_max_watts: 0.0
         pwr_regen_max_watts: 0.0
         pwr_disch_max_watts: 0.0
-        pwr_charge_max_watts: 0.0
+        pwr_charge_max_watts: 150000.0  # Realistic 150 kW regen limit
         pwr_out_electrical_watts: 0.0
         pwr_out_prop_watts: 0.0
         pwr_aux_watts: 0.0
@@ -116,41 +138,32 @@ pt_type:
         energy_aux_joules: []
         energy_loss_joules: []
 
-    mass_kilograms: 1800.0             # Total powertrain mass (battery + motor + gearbox)
+    mass_kilograms: 3200.0             # Total powertrain mass (battery + motor + gearbox)
 
 chassis:
-  drag_coef: 0.60
+  drag_coef: 0.58
   frontal_area_square_meters: 10.0
-  wheel_rr_coef: 0.0065
-  wheel_inertia_kilogram_square_meters: 1.0
+  wheel_rr_coef: 0.0050
+  wheel_inertia_kilogram_square_meters: 12.0
   num_wheels: 6
-  wheel_radius_meters: 0.51
+  wheel_radius_meters: 0.506
   tire_code: ~
   cg_height_meters: 1.25
   wheel_fric_coef: 0.7
   drive_type: RWD
   drive_axle_weight_frac: 0.67
   wheel_base_meters: 5.5
-  mass_kilograms: 15300.0
-  glider_mass_kilograms: 13500.0
-  cargo_mass_kilograms: 20500.0
+  # mass_kilograms: 15300.0
+  glider_mass_kilograms: 7500.0 #Removed this line to avoid double-counting mass from mass_kilograms
+  cargo_mass_kilograms: 25587.0 # Cargo mass (GVWR - chassis mass)
+cabin: None
+hvac: None
 
-cabin:
-  mass_kilograms: 1200.0
-  frontal_area_square_meters: 3.0
-  cg_height_meters: 1.5
-  aux_power_watts: 300
-
-hvac:
-  pwr_heating_watts: 5000
-  pwr_cooling_watts: 5000
-  efficiency: 0.9
-  mass_kilograms: 200
-
-mass_kilograms: 37200.0                 # GVWR
-pwr_aux_base_watts: 1500.0
+# --- TOTAL MASS ---
+# chassis + cabin + hvac + powertrain + cargo = 36,287 kg (≈80,000 lbs)
+mass_kilograms: 36287.0
+pwr_aux_base_watts: 3000.0
 save_interval: 1
-
 state:
   i: 0
   time_seconds: 0.0
@@ -181,7 +194,6 @@ state:
   elev_curr_meters: 0.0
   air_density_kilograms_per_cubic_meter: 0.0
   mass_kilograms: .nan
-
 history:
   i: []
   time_seconds: []

@@ -1,80 +1,83 @@
-import pandas as pd
+import polars as pl
 from pathlib import Path
 
 import fastsim as fsim
-import argparse
-# import fsim.Cycle as Cycle
-# from fastsim.vehicles import Vehicle
-# from fastsim.simdrive import SimDrive
-
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--cycle", "-c",
-    type=str,
-    default="hwfet.csv",
-    choices=["udds.csv", "hwfet.csv", "us06.csv"],
-    help="Cycle to use for the simulation. Default is 'hwfet.csv'."
-    )
-args = parser.parse_args()
-
 # -----------------------------
-# 1) Build a Kenworth T680E–like BEV
+# 1) Build a Kenworth T680E BEV
 # -----------------------------
 
 veh = fsim.Vehicle.from_file("/home/zacmaughan/repos/routee-powertrain/scripts/fastsim/kenworth_t680e.yaml")
+veh.set_save_interval(1)  # Set save interval to 1 second for detailed history
 
 # -----------------------------
 # 2) Build a “classic U.S.” cycle (UDDS, HWFET, US06)
 # -----------------------------
-# The UDDS is a typical urban cycle, HWFET is a highway cycle, and US06 is an aggressive highway cycle.
+# The UDDS is a typical urban cycle, HWFET is a highway cycle
 
-cycle = fsim.Cycle.from_file(args.cycle)
+cycle = fsim.Cycle.from_file("/home/zacmaughan/repos/routee-powertrain/scripts/fastsim/hwfet.csv")
 
 # -----------------------------
 # 3) Run the simulation
 # -----------------------------
-sd = fsim.SimDrive(cycle, veh)
-# For BEVs, you can provide an initial SOC; FASTSim will iterate to hit end-of-cycle SOC if needed.
-out = sd.sim_drive(init_soc=0.8)
+sd = fsim.SimDrive(veh, cycle)
+sd.walk()  # populates histories
 
 # -----------------------------
-# 4) Summarize and export results
+# 4) Convert to DataFrame
 # -----------------------------
-# The SimDrive object holds achieved speed, power flows, battery SOC, distance, etc.
-# Field names can vary across FASTSim versions; the most stable items are in sd.cyc (the cycle) and
-# battery SOC arrays. If a key below is missing in your version, comment it out and re-run.
+df = sd.to_dataframe()
+
+# ----------------------------------------
+# 5) Compute dt, step energy, cumulative energy
+# ----------------------------------------
+df = df.with_columns([
+    (pl.col("cyc.time_seconds").diff().fill_null(0)).alias("dt_s"),
+    (pl.col("veh.pt_type.BEV.res.history.pwr_out_electrical_watts") * 
+     pl.col("cyc.time_seconds").diff().fill_null(0)).alias("battery_energy_step_j"),
+])
+
+df = df.with_columns(
+    (pl.col("battery_energy_step_j").cum_sum()).alias("battery_energy_cum_j")
+)
+
+df = df.with_columns(
+    (pl.col("battery_energy_cum_j") / 3.6e6).alias("battery_energy_cum_kwh")
+)
+
+# ----------------------------------------
+# 6) Summarize key metrics
+# ----------------------------------------
+total_distance_km = (
+    (df["veh.history.speed_ach_meters_per_second"] * df["dt_s"]).sum() / 1000
+)
+
+final_soc = df["veh.pt_type.BEV.res.history.soc"].to_numpy()[-1]
+total_energy_kwh = df["battery_energy_cum_kwh"].to_numpy()[-1]
 
 summary = {
-    "vehicle": veh.name,
-    "route_name": "Classic U.S. Cycle",
-    "total_distance_km": getattr(sd, "dist_m", 0.0) / 1000.0 if hasattr(sd, "dist_m") else None,
-    "final_soc": getattr(sd, "ess_soc", [None])[-1] if hasattr(sd, "ess_soc") else None,
+    "vehicle": "Kenworth T680E",
+    "route_name": "HWFET Cycle",
+    "total_distance_km": total_distance_km,
+    "final_soc": final_soc,
+    "total_energy_kwh": total_energy_kwh,
 }
 
 print("=== FASTSim summary ===")
 for k, v in summary.items():
     print(f"{k}: {v}")
 
-# Build a per-step dataframe useful for RouteE
-# (RouteE typically wants per-link energy or per-second energy you can aggregate to links.)
-time_s = getattr(sd.cyc, "time_s", None)
-mps = getattr(sd, "ach_mps", None) if hasattr(sd, "ach_mps") else getattr(sd.cyc, "mps", None)
-soc = getattr(sd, "ess_soc", None)
-battery_kw = getattr(sd, "ess_kw_out_ach", None) if hasattr(sd, "ess_kw_out_ach") else None
-dist_step_m = None
-if hasattr(sd.cyc, "trapz_step_distances"):
-    # distance covered per step (if available in your version)
-    dist_step_m = sd.cyc.trapz_step_distances()
+# ----------------------------------------
+# 7) Export CSV for RouteE
+# ----------------------------------------
+out_path = Path("t680e_hwfet_routee.csv")
 
-df = pd.DataFrame({
-    "time_s": time_s if time_s is not None else [],
-    "speed_mps": mps if mps is not None else [],
-    "soc": soc if soc is not None else [],
-    "battery_kw": battery_kw if battery_kw is not None else [],
-    "step_distance_m": dist_step_m if dist_step_m is not None else [],
-})
+df_export = df.select([
+    "cyc.time_seconds",
+    "veh.history.speed_ach_meters_per_second",
+    "veh.pt_type.BEV.res.history.soc",
+    "battery_energy_step_j",
+    "battery_energy_cum_j",
+])
 
-out_path = Path("t680e_mixed_route_results.csv")
-df.to_csv(out_path, index=False)
-print(f"\nWrote {out_path.resolve()}")
+df_export.write_csv(out_path)
+print(f"\nWrote RouteE-compatible CSV: {out_path.resolve()}")

@@ -10,7 +10,7 @@ veh = fsim.Vehicle.from_file("/home/zacmaughan/repos/routee-powertrain/scripts/f
 veh.set_save_interval(1)  # Set save interval to 1 second for detailed history
 
 # -----------------------------
-# 2) Build a “classic U.S.” cycle (UDDS, HWFET, US06)
+# 2) Build a “classic U.S.” cycle (UDDS, HWFET)
 # -----------------------------
 # The UDDS is a typical urban cycle, HWFET is a highway cycle
 
